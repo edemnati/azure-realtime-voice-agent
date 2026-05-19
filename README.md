@@ -1,6 +1,20 @@
 # Azure Realtime Voice Agent — Triple-Mode Demo
 
-A demo application showcasing three approaches to building **real-time voice agents** on Azure, served through a single web application:
+A demo application showcasing three approaches to building **real-time voice agents** on Azure, served through a single web application.
+
+> 📖 **[Solution Comparison Guide](COMPARISON.md)** — Detailed pros/cons and decision guide for choosing the right mode.
+
+## Demo
+
+<!-- Replace the placeholder below with your recording. Supported formats: MP4, GIF, or a link to YouTube/Loom -->
+> 🎬 *Demo video coming soon — drop your recording in the `assets/` folder and update the link below.*
+
+<!-- Uncomment one of these when you have a recording:
+![Demo](assets/demo.gif)
+[![Watch the demo](assets/demo-thumbnail.png)](https://your-video-url-here)
+-->
+
+---
 
 | Mode | SDK | Tool Calling | Best For |
 |------|-----|:------------:|----------|
