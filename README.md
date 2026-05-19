@@ -40,14 +40,18 @@ A production-ready sample demonstrating two approaches to building **real-time v
 - Direct WebSocket connection to Azure OpenAI Realtime API (GA endpoint)
 - **LangGraph tool orchestration** — function calling for weather, time, knowledge base
 - Supports GA models (`gpt-realtime-mini`, `gpt-realtime`, `gpt-realtime-1.5`)
-- Server-side VAD with configurable thresholds
+- Server-side VAD with configurable threshold and silence duration
 - Input audio transcription via Whisper
+- OpenAI voices (alloy, echo, shimmer, etc.)
+- Speech interruption handling
 
 ### Voice Live SDK Mode (Azure Foundry)
-- Uses the official `azure-ai-voicelive` Python SDK
-- **Managed audio pipeline** with built-in echo cancellation and noise reduction
-- Azure neural voices (e.g., `en-US-Ava:DragonHDLatestNeural`) in addition to OpenAI voices
-- Simplified session management — no raw WebSocket handling required
+- Managed connection via the official `azure-ai-voicelive` Python SDK
+- **LangGraph tool orchestration** — function calling for weather, time, knowledge base
+- Supports GA models (`gpt-realtime-mini`, `gpt-realtime`, `gpt-realtime-1.5`)
+- Server-side VAD + Azure Semantic VAD (AI-powered turn detection)
+- Built-in echo cancellation and noise reduction
+- Azure neural voices (e.g., `en-US-Ava:DragonHDLatestNeural`) + OpenAI voices
 - Automatic speech interruption handling
 
 ### Shared
