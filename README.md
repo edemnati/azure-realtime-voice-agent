@@ -1,37 +1,38 @@
-# Azure Realtime Voice Agent — Dual-Mode Demo
+# Azure Realtime Voice Agent — Triple-Mode Demo
 
-A production-ready sample demonstrating two approaches to building **real-time voice agents** on Azure, served through a single web application:
+A demo application showcasing three approaches to building **real-time voice agents** on Azure, served through a single web application:
 
 | Mode | SDK | Tool Calling | Best For |
 |------|-----|:------------:|----------|
 | **Raw WebSocket** | `websockets` + direct Azure OpenAI Realtime API | ✅ Full LangGraph support | Custom orchestration, function calling, agentic workflows |
 | **Voice Live SDK** | `azure-ai-voicelive` | ✅ LangGraph support | Managed voice experience, echo cancellation, noise reduction |
+| **Foundry Agent** | `azure-ai-voicelive` + Agent config | ✅ Agent-managed (server-side) | Pre-built agents with tools, instructions, and voice config managed in Foundry |
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────┐        WebSocket         ┌─────────────────────────────────────────────┐
-│   Browser        │ ◄────────────────────── │            FastAPI Server (main.py)           │
-│   (24kHz PCM16)  │ ───────────────────────►│                                             │
-└─────────────────┘     audio / events        │  ┌───────────────────────────────────────┐  │
-                                              │  │  LangGraph Agent (graph.py + tools.py) │  │
-                                              │  │  Tools: time, weather, knowledge base  │  │
-                                              │  └───────────────────────────────────────┘  │
-                                              │                                             │
-                                              │  ┌─────────────────┐  ┌──────────────────┐  │
-                                              │  │ RealtimeClient   │  │FoundryRealtime   │  │
-                                              │  │ (Raw WebSocket)  │  │Client (VoiceLive)│  │
-                                              │  └────────┬────────┘  └────────┬─────────┘  │
-                                              └───────────┼────────────────────┼────────────┘
-                                                          │                    │
-                                                          ▼                    ▼
-                                              ┌───────────────────────┐  ┌──────────────────────────┐
-                                              │ Azure OpenAI          │  │ Azure Voice Live API      │
-                                              │ Realtime API (GA)     │  │ (Managed, echo/noise)     │
-                                              │ wss://...openai.azure │  │ services.ai.azure.com     │
-                                              └───────────────────────┘  └──────────────────────────┘
+┌─────────────────┐        WebSocket         ┌──────────────────────────────────────────────────────────┐
+│   Browser        │ ◄────────────────────── │               FastAPI Server (main.py)                    │
+│   (24kHz PCM16)  │ ───────────────────────►│                                                          │
+└─────────────────┘     audio / events        │  ┌───────────────────────────────────────┐               │
+                                              │  │  LangGraph Agent (graph.py + tools.py) │               │
+                                              │  │  Tools: time, weather, knowledge base  │               │
+                                              │  └───────────────────────────────────────┘               │
+                                              │                                                          │
+                                              │  ┌─────────────────┐ ┌────────────────┐ ┌─────────────┐  │
+                                              │  │ RealtimeClient   │ │FoundryRealtime │ │FoundryAgent │  │
+                                              │  │ (Raw WebSocket)  │ │Client(VoiceLive│ │Client(Agent)│  │
+                                              │  └────────┬────────┘ └───────┬────────┘ └──────┬──────┘  │
+                                              └───────────┼──────────────────┼────────────────┼──────────┘
+                                                          │                  │                │
+                                                          ▼                  ▼                ▼
+                                              ┌───────────────────────┐  ┌──────────────────────────────┐
+                                              │ Azure OpenAI          │  │ Azure Voice Live API          │
+                                              │ Realtime API (GA)     │  │ (Session mode / Agent mode)   │
+                                              │ wss://...openai.azure │  │ services.ai.azure.com         │
+                                              └───────────────────────┘  └──────────────────────────────┘
 ```
 
 ---
@@ -56,6 +57,19 @@ A production-ready sample demonstrating two approaches to building **real-time v
 - Azure neural voices (e.g., `en-US-Ava:DragonHDLatestNeural`) + OpenAI voices
 - Automatic speech interruption handling
 
+### Foundry Agent Mode (Voice Live + Agent)
+- Connects to a **pre-configured Foundry Agent** via the Voice Live SDK
+- Agent manages its own instructions, tools, and voice configuration server-side
+- **No LangGraph needed** — tools are executed by the agent in Foundry (events still visible in UI)
+- Built-in echo cancellation and noise reduction (configured in agent metadata)
+- Azure Semantic VAD with multilingual end-of-utterance detection
+- Interim response generation (fills latency gaps during tool calls)
+- **Requires Microsoft Entra ID** authentication (no API key support)
+- Create/update agents programmatically via `scripts/create_agent.py`
+- Uses `azure-ai-projects` SDK 2.x with `create_version` API
+- Voice Live config stored in agent metadata under `microsoft.voice-live.configuration` key
+- Ideal for pre-built agents deployed in Azure AI Foundry
+
 ### Shared
 - **Web-based UI** with client mode toggle (switch before connecting)
 - Live audio visualizer
@@ -72,12 +86,16 @@ A production-ready sample demonstrating two approaches to building **real-time v
 2. **Azure OpenAI Resource** with a deployed realtime model
    - For WebSocket mode: deploy `gpt-realtime-mini` (or `gpt-realtime`, `gpt-realtime-1.5`)
    - Supported regions: East US 2, Sweden Central
-3. **Microsoft Foundry resource** (for Voice Live mode)
+3. **Microsoft Foundry resource** (for Voice Live and Foundry Agent modes)
    - Endpoint format: `https://<resource>.services.ai.azure.com/`
    - No model deployment needed — Voice Live is fully managed
-4. **Azure CLI** (`az login`) for Entra ID authentication
-5. **Role Assignment**: `Cognitive Services User` on the resource
-6. **Browser** with microphone access (Chrome/Edge recommended)
+4. **Foundry Agent** (for Agent mode only)
+   - Create an agent via the included script: `python scripts/create_agent.py`
+   - Or create manually in [Azure AI Foundry](https://ai.azure.com/) with voice mode enabled
+   - Note the agent name and project name
+5. **Azure CLI** (`az login`) for Entra ID authentication
+6. **Role Assignment**: `Cognitive Services User` on the resource
+7. **Browser** with microphone access (Chrome/Edge recommended)
 
 ---
 
@@ -109,6 +127,15 @@ REALTIME_API_MODE=ga
 # Voice Live SDK mode
 AZURE_VOICELIVE_ENDPOINT=https://your-resource.services.ai.azure.com/
 AZURE_VOICELIVE_MODEL=gpt-realtime-mini
+
+# Foundry Agent mode (requires Entra ID)
+PROJECT_ENDPOINT=https://your-resource.services.ai.azure.com/api/projects/your-project-name
+FOUNDRY_AGENT_NAME=MyVoiceAgent
+FOUNDRY_PROJECT_NAME=your-project-name
+FOUNDRY_AGENT_MODEL=gpt-5-mini
+# FOUNDRY_AGENT_VERSION=          # optional, defaults to latest
+# FOUNDRY_CONVERSATION_ID=        # optional, for resuming conversations
+# FOUNDRY_RESOURCE_OVERRIDE=      # optional
 ```
 
 ### 3. Authenticate (Microsoft Entra ID)
@@ -165,13 +192,30 @@ AZURE_USE_ENTRA_ID=false
 AZURE_OPENAI_API_KEY=your-actual-api-key
 ```
 
-### 4. Run
+### 4. Create Foundry Agent (Agent mode only)
+
+```bash
+python scripts/create_agent.py
+```
+
+This creates/updates a Foundry Agent with Voice Live configuration stored in metadata:
+
+- **Voice**: `en-US-Ava:DragonHDLatestNeural` (Azure standard)
+- **Turn Detection**: Azure Semantic VAD with multilingual EOU
+- **Noise Reduction**: Azure Deep Noise Suppression
+- **Echo Cancellation**: Server echo cancellation
+- **Interim Response**: LLM-generated filler during latency/tool calls
+- **Language**: `en-US`
+
+The script uses `azure-ai-projects` SDK 2.x (`create_version` API) and stores voice config under the `microsoft.voice-live.configuration` metadata key.
+
+### 5. Run
 
 ```bash
 python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### 5. Open
+### 6. Open
 
 Navigate to [http://localhost:8000](http://localhost:8000)
 
@@ -213,7 +257,8 @@ docker run -p 8000:8000 --env-file .env azure-realtime-voice-agent
 
 1. Select **Client Mode** from the dropdown:
    - *Raw WebSocket* — full tool calling support via LangGraph
-   - *Voice Live SDK* — managed audio with echo cancellation
+   - *Voice Live SDK* — managed audio with echo cancellation + LangGraph tools
+   - *Foundry Agent* — server-managed agent with voice config, tools & instructions in Foundry
 2. Click **Connect** to establish the audio session
 3. Grant microphone permission when prompted
 4. **Speak naturally** — server-side VAD handles turn-taking
@@ -264,8 +309,11 @@ azure-realtime-voice-agent/
 │   ├── main.py                # FastAPI server, WebSocket bridge, client routing
 │   ├── realtime_client.py     # Raw WebSocket client (Azure OpenAI Realtime API)
 │   ├── foundry_client.py      # Voice Live SDK client (azure-ai-voicelive)
+│   ├── agent_client.py        # Foundry Agent client (Voice Live + Agent mode)
 │   ├── graph.py               # LangGraph state machine for tool orchestration
 │   └── tools.py               # Tool definitions and implementations
+├── scripts/
+│   └── create_agent.py        # Create/update Foundry Agent with Voice Live config
 ├── frontend/
 │   ├── index.html             # Web page with mode toggle
 │   ├── app.js                 # Audio capture, WebSocket comm, playback

@@ -78,6 +78,11 @@ header h1 {
     animation: pulse-dot 1s infinite;
 }
 
+.status-dot.error {
+    background: var(--danger);
+    animation: pulse-dot 0.5s infinite;
+}
+
 @keyframes pulse-dot {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }

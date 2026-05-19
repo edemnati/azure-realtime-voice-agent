@@ -5,4 +5,5 @@ python-dotenv>=1.0.0
 langgraph>=0.2.0
 langchain-core>=0.3.0
 azure-identity>=1.15.0
-azure-ai-voicelive[aiohttp]
+azure-ai-voicelive[aiohttp]>=1.2.0b4
+azure-ai-projects>=2.0.0b3

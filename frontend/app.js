@@ -62,16 +62,17 @@ class LiveVoiceApp {
     }
 
     _updateFoundryOptions() {
-        const isFoundry = document.getElementById('clientMode').value === 'foundry';
+        const mode = document.getElementById('clientMode').value;
+        const isFoundryLike = mode === 'foundry' || mode === 'agent';
         document.querySelectorAll('.foundry-only-option').forEach(el => {
-            el.style.opacity = isFoundry ? '1' : '0.4';
+            el.style.opacity = isFoundryLike ? '1' : '0.4';
         });
         document.querySelectorAll('.foundry-only-option input').forEach(el => {
-            el.disabled = !isFoundry;
+            el.disabled = !isFoundryLike;
         });
         const semanticOpt = document.querySelector('#turnDetection option[value="semantic_vad"]');
-        if (semanticOpt) semanticOpt.disabled = !isFoundry;
-        if (!isFoundry && document.getElementById('turnDetection').value === 'semantic_vad') {
+        if (semanticOpt) semanticOpt.disabled = !isFoundryLike;
+        if (!isFoundryLike && document.getElementById('turnDetection').value === 'semantic_vad') {
             document.getElementById('turnDetection').value = 'server_vad';
         }
     }
@@ -133,6 +134,7 @@ class LiveVoiceApp {
             };
 
             // Connect WebSocket
+            this._lastError = null;
             const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const clientMode = document.getElementById('clientMode')?.value || 'websocket';
             const voice = document.getElementById('voiceSelect')?.value || 'alloy';
@@ -169,13 +171,17 @@ class LiveVoiceApp {
             };
 
             this.ws.onclose = () => {
-                this.setStatus('', 'Disconnected');
+                if (!this._lastError) {
+                    this.setStatus('', 'Disconnected');
+                }
                 this.cleanup();
             };
 
             this.ws.onerror = (error) => {
                 console.error('WebSocket error:', error);
-                this.setStatus('', 'Connection error');
+                if (!this._lastError) {
+                    this.setStatus('', 'Connection error');
+                }
                 this.cleanup();
             };
 
@@ -299,7 +305,9 @@ class LiveVoiceApp {
                 break;
 
             case 'error':
-                this.addSystemMessage(`Error: ${data.message}`);
+                this._lastError = data.message;
+                this.setStatus('error', data.message);
+                this.addSystemMessage(`⚠️ ${data.message}`);
                 break;
         }
     }

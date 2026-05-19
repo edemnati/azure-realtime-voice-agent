@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 
 from backend.realtime_client import RealtimeClient, MODE_GA
 from backend.foundry_client import FoundryRealtimeClient
+from backend.agent_client import FoundryAgentClient
 from backend.graph import get_tool_definitions, handle_tool_calls
 
 load_dotenv()
@@ -84,7 +85,29 @@ async def websocket_audio_endpoint(websocket: WebSocket):
         return
 
     # Create the appropriate Realtime API client
-    if client_mode == "foundry":
+    if client_mode == "agent":
+        voicelive_endpoint = os.getenv("AZURE_VOICELIVE_ENDPOINT", endpoint)
+        agent_name = os.getenv("FOUNDRY_AGENT_NAME", "")
+        project_name = os.getenv("FOUNDRY_PROJECT_NAME", "")
+        agent_version = os.getenv("FOUNDRY_AGENT_VERSION") or None
+        conversation_id = os.getenv("FOUNDRY_CONVERSATION_ID") or None
+        foundry_resource_override = os.getenv("FOUNDRY_RESOURCE_OVERRIDE") or None
+
+        if not agent_name or not project_name:
+            await websocket.send_json({"type": "error", "message": "FOUNDRY_AGENT_NAME and FOUNDRY_PROJECT_NAME must be configured for Agent mode"})
+            await websocket.close()
+            return
+
+        realtime_client = FoundryAgentClient(
+            endpoint=voicelive_endpoint,
+            agent_name=agent_name,
+            project_name=project_name,
+            agent_version=agent_version,
+            conversation_id=conversation_id,
+            foundry_resource_override=foundry_resource_override,
+            use_entra_id=use_entra_id,
+        )
+    elif client_mode == "foundry":
         voicelive_endpoint = os.getenv("AZURE_VOICELIVE_ENDPOINT", endpoint)
         voicelive_model = os.getenv("AZURE_VOICELIVE_MODEL", deployment)
         realtime_client = FoundryRealtimeClient(
@@ -218,7 +241,19 @@ async def websocket_audio_endpoint(websocket: WebSocket):
     try:
         # Connect to Azure OpenAI Realtime API
         await realtime_client.connect(on_message=handle_realtime_message)
+    except ValueError as e:
+        # Agent validation failed (e.g., agent not found)
+        logger.error(f"Connection failed: {e}")
+        await websocket.send_json({"type": "error", "message": str(e)})
+        await websocket.close()
+        return
+    except Exception as e:
+        logger.error(f"Connection failed: {e}")
+        await websocket.send_json({"type": "error", "message": f"Failed to connect: {e}"})
+        await websocket.close()
+        return
 
+    try:
         # Configure the session with LangGraph tools
         tools = get_tool_definitions()
         await realtime_client.configure_session(tools=tools, voice=voice, **session_options)
