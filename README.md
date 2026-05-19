@@ -80,7 +80,8 @@ A production-ready sample demonstrating two approaches to building **real-time v
 ### 1. Clone & Install
 
 ```bash
-cd liveVoice-test
+git clone https://github.com/edemnati/azure-realtime-voice-agent.git
+cd azure-realtime-voice-agent
 pip install -r requirements.txt
 ```
 
@@ -127,7 +128,7 @@ Navigate to [http://localhost:8000](http://localhost:8000)
 ### Build
 
 ```bash
-docker build -t livevoice-test .
+docker build -t azure-realtime-voice-agent .
 ```
 
 ### Run
@@ -141,13 +142,13 @@ docker run -p 8000:8000 \
   -e AZURE_VOICELIVE_ENDPOINT=https://your-resource.services.ai.azure.com/ \
   -e AZURE_VOICELIVE_MODEL=gpt-realtime-mini \
   -e REALTIME_API_MODE=ga \
-  livevoice-test
+  azure-realtime-voice-agent
 ```
 
 Or use an env file:
 
 ```bash
-docker run -p 8000:8000 --env-file .env livevoice-test
+docker run -p 8000:8000 --env-file .env azure-realtime-voice-agent
 ```
 
 > **Note:** For Entra ID authentication inside a container, mount Azure CLI credentials or use a managed identity when deploying to Azure (e.g., Azure Container Apps).
@@ -203,7 +204,7 @@ The right panel exposes real-time session configuration. Options are sent as que
 ## Project Structure
 
 ```
-liveVoice-test/
+azure-realtime-voice-agent/
 ├── backend/
 │   ├── __init__.py
 │   ├── main.py                # FastAPI server, WebSocket bridge, client routing
@@ -248,8 +249,8 @@ Both `RealtimeClient` and `FoundryRealtimeClient` implement the same interface:
 
 This allows `main.py` to be client-agnostic — switching modes is transparent.
 
-### LangGraph Tool Orchestration (WebSocket mode only)
-When the Realtime API emits `response.function_call_arguments.done`, the backend:
+### LangGraph Tool Orchestration (Both modes)
+When the Realtime API (or Voice Live SDK) emits `response.function_call_arguments.done`, the backend:
 1. Routes the call through the LangGraph `StateGraph`
 2. Executes the appropriate tool function
 3. Returns the result to the Realtime API
@@ -291,7 +292,7 @@ voice="en-US-Ava:DragonHDLatestNeural"  # Azure neural voice
 
 Use these prompts to verify the voice agent is working correctly across both modes.
 
-### Tool Calling (Raw WebSocket mode)
+### Tool Calling (Both modes)
 
 | # | Question | Expected Behavior |
 |---|----------|-------------------|
