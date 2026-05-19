@@ -111,10 +111,58 @@ AZURE_VOICELIVE_ENDPOINT=https://your-resource.services.ai.azure.com/
 AZURE_VOICELIVE_MODEL=gpt-realtime-mini
 ```
 
-### 3. Authenticate
+### 3. Authenticate (Microsoft Entra ID)
+
+This app uses `DefaultAzureCredential` from the Azure Identity SDK, which tries multiple credential sources in order. For local development:
+
+**Option A — Azure CLI (recommended):**
 
 ```bash
 az login
+```
+
+**Option B — Azure Developer CLI** (if `az login` fails or you need a specific scope):
+
+```bash
+azd auth login --scope https://cognitiveservices.azure.com/.default
+```
+
+**Required Role Assignment:**
+
+Your identity must have the **Cognitive Services User** role on the Azure OpenAI resource:
+
+```bash
+az role assignment create \
+  --assignee <your-user-object-id-or-email> \
+  --role "Cognitive Services User" \
+  --scope /subscriptions/<sub-id>/resourceGroups/<rg>/providers/Microsoft.CognitiveServices/accounts/<resource-name>
+```
+
+**Credential priority** (`DefaultAzureCredential` tries in order):
+
+1. `EnvironmentCredential` — service principal via env vars
+2. `WorkloadIdentityCredential` — Kubernetes workload identity
+3. `ManagedIdentityCredential` — Azure-hosted VMs/containers
+4. `SharedTokenCacheCredential` — cached tokens
+5. `VisualStudioCodeCredential` — VS Code Azure extension
+6. `AzureCliCredential` — `az login` session
+7. `AzurePowerShellCredential` — `Connect-AzAccount`
+8. `AzureDeveloperCliCredential` — `azd auth login`
+
+**Troubleshooting:**
+
+| Symptom | Fix |
+|---------|-----|
+| `DefaultAzureCredential failed to retrieve a token` | Run `az login` or `azd auth login --scope https://cognitiveservices.azure.com/.default` |
+| Token expired / MFA required | Re-run `az login` — tokens expire after ~1 hour of inactivity |
+| `HTTP 403` on WebSocket connect | Ensure `Cognitive Services User` role is assigned |
+| Docker container can't authenticate | Use API key auth (`AZURE_USE_ENTRA_ID=false`) or deploy to Azure with managed identity |
+
+**Switching to API key auth** (if Entra ID is unavailable):
+
+```env
+AZURE_USE_ENTRA_ID=false
+AZURE_OPENAI_API_KEY=your-actual-api-key
 ```
 
 ### 4. Run
