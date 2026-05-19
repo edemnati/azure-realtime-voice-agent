@@ -1,0 +1,126 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LangGraph Live Voice - Azure Voice Live + Realtime API</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>&#127897;&#65039; LangGraph Live Voice</h1>
+            <p class="subtitle">Azure Voice Live SDK + OpenAI Realtime API + LangGraph Tools</p>
+        </header>
+
+        <div class="status-bar" id="statusBar">
+            <span class="status-dot" id="statusDot"></span>
+            <span id="statusText">Disconnected</span>
+        </div>
+
+        <div class="layout-wrapper">
+            <div class="main-content">
+                <div class="audio-controls">
+                    <div class="client-toggle">
+                        <label for="clientMode">Client Mode:</label>
+                        <select id="clientMode" title="WebSocket connects directly to Azure OpenAI Realtime API. Voice Live SDK routes through Azure Foundry with extra audio processing features.">
+                            <option value="websocket" title="Direct WebSocket connection to Azure OpenAI Realtime API â€” lower latency, fewer features">Raw WebSocket (OpenAI Realtime)</option>
+                            <option value="foundry" title="Azure Voice Live SDK â€” adds noise reduction, echo cancellation, semantic VAD, and managed connections">Voice Live SDK (Azure Foundry)</option>
+                        </select>
+                    </div>
+                    <div class="client-toggle">
+                        <label for="voiceSelect">Voice:</label>
+                        <select id="voiceSelect">
+                            <option value="alloy">Alloy</option>
+                            <option value="ash">Ash</option>
+                            <option value="ballad">Ballad</option>
+                            <option value="coral">Coral</option>
+                            <option value="echo">Echo</option>
+                            <option value="sage">Sage</option>
+                            <option value="shimmer">Shimmer</option>
+                            <option value="verse">Verse</option>
+                        </select>
+                    </div>
+                    <button id="connectBtn" class="btn btn-primary">Connect</button>
+                    <button id="resetBtn" class="btn btn-warning" disabled>Reset</button>
+                    <button id="disconnectBtn" class="btn btn-danger" disabled>Disconnect</button>
+                </div>
+
+                <div class="visualizer-container">
+                    <canvas id="audioVisualizer" width="600" height="100"></canvas>
+                    <div class="speaking-indicator" id="speakingIndicator">
+                        <div class="pulse"></div>
+                        <span>Listening...</span>
+                    </div>
+                </div>
+
+                <div class="transcript-container">
+                    <h2>Conversation</h2>
+                    <div id="transcript" class="transcript"></div>
+                </div>
+
+                <div class="tools-panel">
+                    <h3>Tool Activity</h3>
+                    <div id="toolActivity" class="tool-activity">
+                        <p class="placeholder">Tool calls will appear here...</p>
+                    </div>
+                </div>
+            </div>
+
+            <aside class="right-panel">
+                <h3>Session Options</h3>
+
+                <div class="panel-section">
+                    <h4>Turn Detection</h4>
+                    <div class="option-group">
+                        <label for="turnDetection">Mode: <span class="help-icon" data-tip="How the server detects when you stop speaking to trigger a response"><svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm0 12.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM8.75 10a.75.75 0 0 1-1.5 0V9.43a1.75 1.75 0 0 1 1.27-1.68c.55-.15.98-.66.98-1.25a1.5 1.5 0 0 0-3 0 .75.75 0 0 1-1.5 0 3 3 0 1 1 4.75 2.43.25.25 0 0 0-.18.24V10Z"/></svg></span></label>
+                        <select id="turnDetection">
+                            <option value="server_vad" title="Standard Voice Activity Detection â€” uses audio energy levels to detect speech boundaries">Server VAD</option>
+                            <option value="semantic_vad" class="foundry-only" title="AI-powered turn detection that understands pauses in context (e.g. thinking vs. finished speaking). Foundry only.">Azure Semantic VAD</option>
+                        </select>
+                    </div>
+                    <div class="option-group">
+                        <label for="vadThreshold">Threshold: <span id="vadThresholdValue">0.5</span> <span class="help-icon" data-tip="Sensitivity of speech detection. Higher = louder speech required. Lower = more sensitive."><svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm0 12.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM8.75 10a.75.75 0 0 1-1.5 0V9.43a1.75 1.75 0 0 1 1.27-1.68c.55-.15.98-.66.98-1.25a1.5 1.5 0 0 0-3 0 .75.75 0 0 1-1.5 0 3 3 0 1 1 4.75 2.43.25.25 0 0 0-.18.24V10Z"/></svg></span></label>
+                        <input type="range" id="vadThreshold" min="0" max="1" step="0.05" value="0.5">
+                    </div>
+                    <div class="option-group">
+                        <label for="silenceDuration">Silence: <span id="silenceDurationValue">500</span>ms <span class="help-icon" data-tip="How long to wait after you stop speaking before generating a response"><svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm0 12.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM8.75 10a.75.75 0 0 1-1.5 0V9.43a1.75 1.75 0 0 1 1.27-1.68c.55-.15.98-.66.98-1.25a1.5 1.5 0 0 0-3 0 .75.75 0 0 1-1.5 0 3 3 0 1 1 4.75 2.43.25.25 0 0 0-.18.24V10Z"/></svg></span></label>
+                        <input type="range" id="silenceDuration" min="200" max="2000" step="100" value="500">
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h4>Model</h4>
+                    <div class="option-group">
+                        <label for="maxTokens">Max Tokens: <span class="help-icon" data-tip="Limits response length. Shorter limits = faster, more concise replies."><svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm0 12.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM8.75 10a.75.75 0 0 1-1.5 0V9.43a1.75 1.75 0 0 1 1.27-1.68c.55-.15.98-.66.98-1.25a1.5 1.5 0 0 0-3 0 .75.75 0 0 1-1.5 0 3 3 0 1 1 4.75 2.43.25.25 0 0 0-.18.24V10Z"/></svg></span></label>
+                        <select id="maxTokens">
+                            <option value="inf" title="No limit â€” model decides when to stop">Unlimited</option>
+                            <option value="150" title="~1-2 sentences">Short (~150)</option>
+                            <option value="500" title="~1 paragraph">Medium (~500)</option>
+                            <option value="1000" title="~2-3 paragraphs">Long (~1000)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h4>Audio Processing <span class="badge">Foundry only</span></h4>
+                    <div class="option-group foundry-only-option">
+                        <label><input type="checkbox" id="noiseReduction"> Noise Reduction <span class="help-icon" data-tip="Removes background noise (keyboard, fan, traffic) from mic input before sending to the model"><svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm0 12.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM8.75 10a.75.75 0 0 1-1.5 0V9.43a1.75 1.75 0 0 1 1.27-1.68c.55-.15.98-.66.98-1.25a1.5 1.5 0 0 0-3 0 .75.75 0 0 1-1.5 0 3 3 0 1 1 4.75 2.43.25.25 0 0 0-.18.24V10Z"/></svg></span></label>
+                    </div>
+                    <div class="option-group foundry-only-option">
+                        <label><input type="checkbox" id="echoCancellation"> Echo Cancellation <span class="help-icon" data-tip="Prevents the model from hearing its own audio output through your speakers, avoiding feedback loops"><svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm0 12.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM8.75 10a.75.75 0 0 1-1.5 0V9.43a1.75 1.75 0 0 1 1.27-1.68c.55-.15.98-.66.98-1.25a1.5 1.5 0 0 0-3 0 .75.75 0 0 1-1.5 0 3 3 0 1 1 4.75 2.43.25.25 0 0 0-.18.24V10Z"/></svg></span></label>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h4>Instructions</h4>
+                    <textarea id="instructions" rows="3" placeholder="Custom instructions..."></textarea>
+                    <button id="updateSettingsBtn" class="btn btn-secondary btn-sm">Update</button>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

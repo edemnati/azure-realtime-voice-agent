@@ -1,0 +1,17 @@
+.env
+.env.example
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.git/
+.gitignore
+.vscode/
+.idea/
+*.md
+documentation.html
+*.egg-info/
+dist/
+build/
+Thumbs.db
+.DS_Store
