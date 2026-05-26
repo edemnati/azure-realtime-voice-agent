@@ -39,6 +39,16 @@
                             <option value="shimmer">Shimmer</option>
                             <option value="verse">Verse</option>
                         </select>
+                        <select id="voiceSelectAgent" style="display:none">
+                            <option value="fr-CA-SylvieNeural">Sylvie (fr-CA)</option>
+                            <option value="fr-CA-AntoineNeural">Antoine (fr-CA)</option>
+                            <option value="fr-FR-DeniseNeural">Denise (fr-FR)</option>
+                            <option value="fr-FR-HenriNeural">Henri (fr-FR)</option>
+                            <option value="en-US-JennyNeural">Jenny (en-US)</option>
+                            <option value="en-US-GuyNeural">Guy (en-US)</option>
+                            <option value="en-US-AriaNeural">Aria (en-US)</option>
+                            <option value="en-GB-SoniaNeural">Sonia (en-GB)</option>
+                        </select>
                     </div>
                     <button id="connectBtn" class="btn btn-primary">Connect</button>
                     <button id="resetBtn" class="btn btn-warning" disabled>Reset</button>
@@ -67,6 +77,16 @@
             </div>
 
             <aside class="right-panel">
+                <div id="agentInfoPanel" class="panel-section agent-info-panel" style="display:none">
+                    <h4>🤖 Agent Info</h4>
+                    <table class="agent-info-table">
+                        <tr><td class="agent-info-label">Agent</td><td id="agentInfoName" class="agent-info-value">—</td></tr>
+                        <tr><td class="agent-info-label">Endpoint</td><td id="agentInfoEndpoint" class="agent-info-value">—</td></tr>
+                        <tr><td class="agent-info-label">Project</td><td id="agentInfoProject" class="agent-info-value">—</td></tr>
+                        <tr><td class="agent-info-label">Region</td><td id="agentInfoRegion" class="agent-info-value">—</td></tr>
+                    </table>
+                </div>
+
                 <h3>Session Options</h3>
 
                 <div class="panel-section">
