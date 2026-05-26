@@ -9,9 +9,10 @@ venv/
 .vscode/
 .idea/
 *.md
-documentation.html
+*.ipynb
 *.egg-info/
 dist/
 build/
+scripts/
 Thumbs.db
 .DS_Store

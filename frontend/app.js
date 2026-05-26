@@ -47,6 +47,9 @@ class LiveVoiceApp {
         clientModeSelect.addEventListener('change', () => this._updateFoundryOptions());
         this._updateFoundryOptions();
 
+        // Fetch agent config for the info panel
+        this._fetchAgentInfo();
+
         // Initialize visualizer
         this.drawIdleVisualizer();
     }
@@ -64,6 +67,19 @@ class LiveVoiceApp {
     _updateFoundryOptions() {
         const mode = document.getElementById('clientMode').value;
         const isFoundryLike = mode === 'foundry' || mode === 'agent';
+        const isAgent = mode === 'agent';
+
+        // Swap voice dropdowns based on mode
+        const voiceSelect = document.getElementById('voiceSelect');
+        const voiceSelectAgent = document.getElementById('voiceSelectAgent');
+        if (isAgent) {
+            voiceSelect.style.display = 'none';
+            voiceSelectAgent.style.display = '';
+        } else {
+            voiceSelect.style.display = '';
+            voiceSelectAgent.style.display = 'none';
+        }
+
         document.querySelectorAll('.foundry-only-option').forEach(el => {
             el.style.opacity = isFoundryLike ? '1' : '0.4';
         });
@@ -74,6 +90,23 @@ class LiveVoiceApp {
         if (semanticOpt) semanticOpt.disabled = !isFoundryLike;
         if (!isFoundryLike && document.getElementById('turnDetection').value === 'semantic_vad') {
             document.getElementById('turnDetection').value = 'server_vad';
+        }
+
+        // Show/hide agent info panel
+        const agentPanel = document.getElementById('agentInfoPanel');
+        if (agentPanel) agentPanel.style.display = isAgent ? '' : 'none';
+    }
+
+    async _fetchAgentInfo() {
+        try {
+            const resp = await fetch('/config');
+            const cfg = await resp.json();
+            document.getElementById('agentInfoName').textContent = cfg.foundry_agent_name || '—';
+            document.getElementById('agentInfoEndpoint').textContent = cfg.azure_voicelive_endpoint || '—';
+            document.getElementById('agentInfoProject').textContent = cfg.foundry_project_name || '—';
+            document.getElementById('agentInfoRegion').textContent = cfg.azure_region || '—';
+        } catch (e) {
+            console.warn('Failed to fetch agent config:', e);
         }
     }
 
@@ -137,7 +170,9 @@ class LiveVoiceApp {
             this._lastError = null;
             const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const clientMode = document.getElementById('clientMode')?.value || 'websocket';
-            const voice = document.getElementById('voiceSelect')?.value || 'alloy';
+            const voice = clientMode === 'agent'
+                ? (document.getElementById('voiceSelectAgent')?.value || 'fr-CA-SylvieNeural')
+                : (document.getElementById('voiceSelect')?.value || 'alloy');
             const turnDetection = document.getElementById('turnDetection')?.value || 'server_vad';
             const vadThreshold = document.getElementById('vadThreshold')?.value || '0.5';
             const silenceDuration = document.getElementById('silenceDuration')?.value || '500';

@@ -18,18 +18,7 @@ from azure.ai.projects import AIProjectClient
 
 from azure.ai.voicelive.aio import connect, AgentSessionConfig
 from azure.ai.voicelive.models import (
-    AudioEchoCancellation,
-    AudioInputTranscriptionOptions,
-    AudioNoiseReduction,
-    AzureSemanticVadMultilingual,
-    InputAudioFormat,
-    InputTextContentPart,
-    MessageItem,
-    Modality,
-    OutputAudioFormat,
-    RequestSession,
     ServerEventType,
-    ServerVad,
 )
 
 logger = logging.getLogger(__name__)
@@ -137,10 +126,13 @@ class FoundryAgentClient:
         """Receive events from the Voice Live connection."""
         try:
             async for event in self._connection:
+                logger.debug(f"Raw agent event: type={event.type}, attrs={[a for a in dir(event) if not a.startswith('_')]}")
                 if self._on_message:
                     normalized = self._normalize_event(event)
                     if normalized:
                         await self._on_message(normalized)
+                    else:
+                        logger.info(f"Event not normalized (dropped): {event.type}")
         except asyncio.CancelledError:
             pass
         except Exception as e:
@@ -193,6 +185,12 @@ class FoundryAgentClient:
 
         elif event_type == ServerEventType.RESPONSE_DONE:
             self._active_response = False
+            status_str = "unknown"
+            if hasattr(event, 'response') and event.response:
+                status_str = str(getattr(event.response, 'status', 'unknown'))
+                logger.debug(f"Response done: status={status_str}")
+            if "FAILED" in status_str.upper():
+                return {"type": "error", "error": {"message": f"Response failed (status={status_str})"}}
             return {"type": "response.done"}
 
         elif event_type == ServerEventType.RESPONSE_TEXT_DONE:
@@ -226,40 +224,43 @@ class FoundryAgentClient:
             return None
 
     async def configure_session(self, tools: list[dict] = None, instructions: str = "", voice: str = "", **kwargs):
-        """Configure the session. Agent mode uses minimal session config since agent manages its own settings."""
-        session_config = RequestSession(
-            modalities=[Modality.TEXT, Modality.AUDIO],
-            input_audio_format=InputAudioFormat.PCM16,
-            output_audio_format=OutputAudioFormat.PCM16,
-            input_audio_transcription=AudioInputTranscriptionOptions(model="azure-speech"),
-        )
+        """Configure the session. In agent mode, we send a minimal session.update
+        to complete the handshake — the agent's metadata controls voice, turn detection, etc."""
+        # Use the voice selected by the user, default to fr-CA-SylvieNeural
+        voice_name = voice if voice else "fr-CA-SylvieNeural"
+        # Detect language from voice name (e.g. "fr-CA-SylvieNeural" -> "fr-CA")
+        lang_parts = voice_name.split("-")
+        voice_lang = f"{lang_parts[0]}-{lang_parts[1]}" if len(lang_parts) >= 3 else "fr-CA"
 
-        # Optional overrides (agent config takes priority, but these can be set)
-        if kwargs.get("noise_reduction"):
-            session_config.input_audio_noise_reduction = AudioNoiseReduction(type="azure_deep_noise_suppression")
+        # Send a raw dict to avoid any SDK serialization issues with the type field.
+        session_update_event = {
+            "type": "session.update",
+            "session": {
+                "modalities": ["text", "audio"],
+                "input_audio_format": "pcm16",
+                "output_audio_format": "pcm16",
+                "voice": {
+                    "name": voice_name,
+                    "type": "azure-standard",
+                    "temperature": 0.8
+                },
+                "input_audio_transcription": {
+                    "model": "azure-speech",
+                    "language": voice_lang
+                },
+                "turn_detection": {
+                    "type": "azure_semantic_vad",
+                    "end_of_utterance_detection": {
+                        "model": "semantic_detection_v1_multilingual"
+                    }
+                },
+                "input_audio_noise_reduction": {"type": "azure_deep_noise_suppression"},
+                "input_audio_echo_cancellation": {"type": "server_echo_cancellation"},
+            }
+        }
 
-        if kwargs.get("echo_cancellation"):
-            session_config.input_audio_echo_cancellation = AudioEchoCancellation()
-
-        await self._connection.session.update(session=session_config)
-        logger.info("Agent session configured")
-
-        # Send a proactive greeting
-        try:
-            await self._connection.conversation.item.create(
-                item=MessageItem(
-                    role="system",
-                    content=[
-                        InputTextContentPart(
-                            text="Say something to welcome the user."
-                        )
-                    ]
-                )
-            )
-            await self._connection.response.create()
-            logger.info("Proactive greeting sent")
-        except Exception as e:
-            logger.warning(f"Failed to send greeting: {e}")
+        await self._connection.send(session_update_event)
+        logger.info(f"Agent session configured with voice={voice_name}, lang={voice_lang}")
 
     async def send_audio(self, audio_data: str):
         """Send audio data (base64 encoded PCM16) to Voice Live."""

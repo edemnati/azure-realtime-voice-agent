@@ -129,6 +129,40 @@ header h1 {
     border-bottom: 1px solid var(--border);
 }
 
+.agent-info-panel {
+    background: var(--surface-2);
+    border-radius: var(--radius);
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.agent-info-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.7rem;
+}
+
+.agent-info-table td {
+    padding: 0.2rem 0.3rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.agent-info-table tr:last-child td {
+    border-bottom: none;
+}
+
+.agent-info-label {
+    color: var(--text-muted);
+    font-weight: 600;
+    white-space: nowrap;
+    width: 70px;
+}
+
+.agent-info-value {
+    color: var(--text);
+    word-break: break-all;
+}
+
 .panel-section {
     display: flex;
     flex-direction: column;

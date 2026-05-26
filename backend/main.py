@@ -23,6 +23,9 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="LangGraph Live Voice Demo")
 
+# Cached region lookup result
+_cached_region: str = ""
+
 # Serve static frontend files
 frontend_path = Path(__file__).parent.parent / "frontend"
 app.mount("/static", StaticFiles(directory=str(frontend_path)), name="static")
@@ -39,6 +42,63 @@ async def health_check():
     """Health check endpoint."""
     api_mode = os.getenv("REALTIME_API_MODE", MODE_GA)
     return {"status": "ok", "service": "langgraph-live-voice", "api_mode": api_mode}
+
+
+@app.get("/config")
+async def get_config():
+    """Return current agent/connection configuration for UI display."""
+    endpoint = os.getenv("AZURE_VOICELIVE_ENDPOINT", os.getenv("AZURE_OPENAI_ENDPOINT", ""))
+    project_name = os.getenv("FOUNDRY_PROJECT_NAME", "")
+    agent_name = os.getenv("FOUNDRY_AGENT_NAME", "")
+
+    # Try to get region by matching endpoint resource name against ARM (cached)
+    global _cached_region
+    region = os.getenv("AZURE_REGION", "") or _cached_region
+    if not region and endpoint:
+        try:
+            from urllib.parse import urlparse
+            from azure.identity import DefaultAzureCredential
+            import requests as _requests
+
+            host = urlparse(endpoint).hostname or ""
+            resource_name = host.split(".")[0]  # e.g. "ez-aifoundry-test-ca"
+
+            cred = DefaultAzureCredential()
+            token = cred.get_token("https://management.azure.com/.default").token
+            headers = {"Authorization": f"Bearer {token}"}
+
+            # Search across subscriptions for the resource
+            subs_resp = _requests.get(
+                "https://management.azure.com/subscriptions?api-version=2022-12-01",
+                headers=headers
+            )
+            for sub in subs_resp.json().get("value", []):
+                sub_id = sub["subscriptionId"]
+                res_resp = _requests.get(
+                    f"https://management.azure.com/subscriptions/{sub_id}/providers/Microsoft.CognitiveServices/accounts?api-version=2023-05-01",
+                    headers=headers
+                )
+                if res_resp.status_code == 200:
+                    for account in res_resp.json().get("value", []):
+                        if account.get("name", "").lower() == resource_name.lower():
+                            region = account.get("location", "")
+                            break
+                if region:
+                    break
+            if region:
+                _cached_region = region
+        except Exception as e:
+            logger.debug(f"Could not get resource region: {e}")
+
+    return {
+        "azure_openai_endpoint": os.getenv("AZURE_OPENAI_ENDPOINT", ""),
+        "azure_voicelive_endpoint": endpoint,
+        "foundry_agent_name": agent_name,
+        "foundry_project_name": project_name,
+        "foundry_agent_version": os.getenv("FOUNDRY_AGENT_VERSION", ""),
+        "azure_openai_deployment": os.getenv("AZURE_OPENAI_REALTIME_DEPLOYMENT", "gpt-realtime-mini"),
+        "azure_region": region,
+    }
 
 
 @app.websocket("/ws/audio")

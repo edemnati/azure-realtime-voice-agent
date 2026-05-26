@@ -25,3 +25,13 @@ Thumbs.db
 dist/
 build/
 *.egg-info/
+
+# Test/debug artifacts
+output.txt
+*.ipynb
+
+# Reference documents (uploaded separately to agent)
+doc/*.pdf
+doc/*.docx
+doc/*.txt
+doc/*.md

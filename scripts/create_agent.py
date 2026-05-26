@@ -21,7 +21,7 @@ import os
 import sys
 
 from azure.ai.projects import AIProjectClient
-from azure.ai.projects.models import PromptAgentDefinition
+from azure.ai.projects.models import FileSearchTool, PromptAgentDefinition
 from azure.core.exceptions import HttpResponseError
 from azure.identity import DefaultAzureCredential
 from dotenv import load_dotenv
@@ -38,19 +38,23 @@ MODEL = os.getenv("FOUNDRY_AGENT_MODEL", "gpt-5-mini")
 AGENT_INSTRUCTIONS = """You are a helpful voice assistant powered by Azure AI Foundry.
 You respond in a natural conversational tone. Keep answers concise and clear.
 When the user asks a question, provide a direct answer.
-If you don't know something, say so honestly."""
+If you don't know something, say so honestly.
+You have access to a file search tool that contains reference documents. Use it when the user asks questions about plans, policies, or actions."""
+
+# Path to documents folder for file_search tool
+DOC_FOLDER = os.path.join(os.path.dirname(__file__), "..", "doc")
 
 # Voice Live session configuration (stored in agent metadata)
 VOICE_LIVE_CONFIG = {
     "session": {
         "voice": {
-            "name": "en-US-Ava:DragonHDLatestNeural",
+            "name": "fr-CA-SylvieNeural",
             "type": "azure-standard",
             "temperature": 0.8
         },
         "input_audio_transcription": {
             "model": "azure-speech",
-            "language": "en-US"
+            "language": "fr-CA"
         },
         "turn_detection": {
             "type": "azure_semantic_vad",
@@ -92,6 +96,37 @@ def reassemble_config(metadata: dict) -> str:
     return config
 
 
+def upload_documents(project):
+    """Upload documents from doc/ folder and create a vector store for file_search."""
+    if not os.path.isdir(DOC_FOLDER):
+        print(f"  No doc/ folder found at {DOC_FOLDER}, skipping file_search setup.")
+        return None
+
+    files = [f for f in os.listdir(DOC_FOLDER) if os.path.isfile(os.path.join(DOC_FOLDER, f))]
+    if not files:
+        print("  No files found in doc/ folder, skipping file_search setup.")
+        return None
+
+    oai = project.get_openai_client()
+    uploaded_file_ids = []
+
+    for filename in files:
+        filepath = os.path.join(DOC_FOLDER, filename)
+        print(f"  Uploading: {filename}")
+        with open(filepath, "rb") as f:
+            uploaded = oai.files.create(file=f, purpose="assistants")
+        uploaded_file_ids.append(uploaded.id)
+        print(f"    -> file_id: {uploaded.id}")
+
+    print(f"  Creating vector store with {len(uploaded_file_ids)} file(s)...")
+    vector_store = oai.vector_stores.create(
+        file_ids=uploaded_file_ids,
+        name=f"{AGENT_NAME}-documents",
+    )
+    print(f"    -> vector_store_id: {vector_store.id}")
+    return vector_store.id
+
+
 def create_agent():
     """Create or update the Foundry agent with Voice Live configuration."""
     if not PROJECT_ENDPOINT:
@@ -116,6 +151,15 @@ def create_agent():
     # Build metadata with Voice Live config using the official key format
     metadata = chunk_config(json.dumps(VOICE_LIVE_CONFIG))
 
+    # Upload documents and create vector store for file_search
+    print("Setting up file_search tool...")
+    vector_store_id = upload_documents(project)
+
+    tools = []
+    if vector_store_id:
+        tools.append(FileSearchTool(vector_store_ids=[vector_store_id]))
+        print(f"  file_search tool configured with vector_store: {vector_store_id}")
+
     try:
         # Create agent version using the new Foundry API
         print("Creating agent version...")
@@ -124,6 +168,7 @@ def create_agent():
             definition=PromptAgentDefinition(
                 model=MODEL,
                 instructions=AGENT_INSTRUCTIONS,
+                tools=tools if tools else None,
             ),
             metadata=metadata,
         )

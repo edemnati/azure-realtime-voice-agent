@@ -78,6 +78,9 @@ A demo application showcasing three approaches to building **real-time voice age
 - Built-in echo cancellation and noise reduction (configured in agent metadata)
 - Azure Semantic VAD with multilingual end-of-utterance detection
 - Interim response generation (fills latency gaps during tool calls)
+- **File Search Tool** — automatically attach reference documents (PDF, DOCX, TXT, etc.) from `doc/` folder
+  - `scripts/create_agent.py` uploads documents to OpenAI Files API and creates a vector store
+  - Agent can search and cite documents when answering user questions
 - **Requires Microsoft Entra ID** authentication (no API key support)
 - Create/update agents programmatically via `scripts/create_agent.py`
 - Uses `azure-ai-projects` SDK 2.x with `create_version` API
@@ -118,7 +121,7 @@ A demo application showcasing three approaches to building **real-time voice age
 ### 1. Clone & Install
 
 ```bash
-git clone https://github.com/edemnati/azure-realtime-voice-agent.git
+git clone https://github.com/your-org/azure-realtime-voice-agent.git
 cd azure-realtime-voice-agent
 pip install -r requirements.txt
 ```
@@ -208,18 +211,30 @@ AZURE_OPENAI_API_KEY=your-actual-api-key
 
 ### 4. Create Foundry Agent (Agent mode only)
 
+**Optional: Add reference documents to the agent**
+
+Place any documents (PDF, DOCX, TXT, etc.) in the `doc/` folder. The script will automatically:
+1. Upload them to the OpenAI Files API
+2. Create a vector store for semantic search
+3. Attach the `file_search` tool to the agent
+
+The agent can then search these documents when answering user questions.
+
+**Create or update the agent:**
+
 ```bash
 python scripts/create_agent.py
 ```
 
 This creates/updates a Foundry Agent with Voice Live configuration stored in metadata:
 
-- **Voice**: `en-US-Ava:DragonHDLatestNeural` (Azure standard)
+- **Voice**: `fr-CA-SylvieNeural` (Azure standard, customizable)
 - **Turn Detection**: Azure Semantic VAD with multilingual EOU
 - **Noise Reduction**: Azure Deep Noise Suppression
 - **Echo Cancellation**: Server echo cancellation
 - **Interim Response**: LLM-generated filler during latency/tool calls
-- **Language**: `en-US`
+- **File Search Tool** (if documents present in `doc/`): Enables document retrieval and citation
+- **Language**: Auto-detected from voice name (e.g., `fr-CA` from `fr-CA-SylvieNeural`)
 
 The script uses `azure-ai-projects` SDK 2.x (`create_version` API) and stores voice config under the `microsoft.voice-live.configuration` metadata key.
 
@@ -327,17 +342,18 @@ azure-realtime-voice-agent/
 │   ├── graph.py               # LangGraph state machine for tool orchestration
 │   └── tools.py               # Tool definitions and implementations
 ├── scripts/
-│   └── create_agent.py        # Create/update Foundry Agent with Voice Live config
+│   └── create_agent.py        # Create/update Foundry Agent with Voice Live config & file_search
 ├── frontend/
 │   ├── index.html             # Web page with mode toggle
 │   ├── app.js                 # Audio capture, WebSocket comm, playback
 │   └── styles.css             # UI styling
+├── doc/                       # Reference documents for agent file_search tool
+│   └── (add .pdf, .docx, .txt files here)
 ├── .dockerignore              # Files excluded from Docker build context
 ├── .env.example               # Environment variable template
-├── .env                       # Your local configuration (git-ignored)
 ├── .gitignore                 # Git ignore rules
+├── COMPARISON.md              # Detailed solution comparison guide
 ├── Dockerfile                 # Container build definition
-├── documentation.html         # Azure Voice APIs reference doc (static, not served)
 ├── requirements.txt           # Python dependencies
 └── README.md
 ```
@@ -388,6 +404,28 @@ Set `REALTIME_API_MODE=ga` in your `.env` file.
 
 ## Extending the Demo
 
+### Adding Reference Documents (Foundry Agent mode)
+
+1. Place documents in the `doc/` folder (supports `.pdf`, `.docx`, `.txt`, `.md`, etc.)
+2. Run `python scripts/create_agent.py`
+3. The script will:
+   - Upload files to OpenAI Files API
+   - Create a vector store for semantic search
+   - Attach the `file_search` tool to your agent
+4. The agent can now search and cite documents when answering questions
+
+**Example:**
+```bash
+# Add a policy document
+cp company-policy.pdf doc/
+
+# Create/update the agent with file_search
+python scripts/create_agent.py
+
+# In the UI, ask: "What is our company policy on remote work?"
+# The agent will search the PDF and provide an answer
+```
+
 ### Adding Custom Tools
 Edit `backend/tools.py`:
 1. Add a function implementation
@@ -401,6 +439,32 @@ In `backend/foundry_client.py`, change the `voice` parameter:
 ```python
 voice="en-US-Ava:DragonHDLatestNeural"  # Azure neural voice
 ```
+
+### Customizing Agent Instructions and Voice (Foundry Agent mode)
+Edit `scripts/create_agent.py`:
+
+**Change the voice:**
+```python
+VOICE_LIVE_CONFIG = {
+    "session": {
+        "voice": {
+            "name": "en-US-JennyNeural",  # Change to any Azure or OpenAI voice
+            "type": "azure-standard",
+            "temperature": 0.8
+        },
+        # ...
+    }
+}
+```
+
+**Update instructions:**
+```python
+AGENT_INSTRUCTIONS = """Your custom instructions here.
+You have access to reference documents via file_search.
+Use them to provide accurate, cited responses."""
+```
+
+Then re-run `python scripts/create_agent.py` to apply changes.
 
 ---
 
